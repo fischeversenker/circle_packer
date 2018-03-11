@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+        body, html {
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <script>
+        const canvas = window.canvas;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const padding = 10;
+
+        class CirclePacker {
+            constructor(ctx) {
+                this.ctx = ctx;
+                this.circles = [];
+                this.lastPointAdded = null;
+            }
+            pack() {
+
+                // spawn circles
+                setInterval(() => {
+                    this.circles.push(new Circle(this.getRandomCoords()));
+                    this.lastPointAdded = Date.now();
+                }, 21);
+
+                // tick, tack...
+                function update() {
+                    requestAnimationFrame(update);
+                    packer.tick();
+                    if (Date.now() - packer.lastPointAdded > 80) {
+                        packer.reset();
+                    }
+                }
+                requestAnimationFrame(update);
+            }
+            getRandomCoords() {
+                let x = Math.random() * this.ctx.canvas.width;
+                let y = Math.random() * this.ctx.canvas.height;
+                while(!this.areCoordsFree(x, y)) {
+                    x = Math.random() * this.ctx.canvas.width;
+                    y = Math.random() * this.ctx.canvas.height;
+                }
+                return new Point(x, y);
+            }
+            areCoordsFree(x, y) {
+                let res = true;
+                this.circles.forEach(circle => {
+                    if (res === true && circle.distance(new Point(x, y)) < circle.radius + padding) {
+                        res = false;
+                    }
+                });
+                return res;
+            }
+            tick() {
+                this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                this.circles.forEach(circle => {
+                    this.drawCircle(circle);
+                    if (circle.growing && this.mayCircleGrow(circle)) {
+                        circle.grow();
+                    } else {
+                        circle.growing = false;
+                    }
+                });
+            }
+            mayCircleGrow(circle) {
+                let can = true;
+                if (circle.origin.x - circle.radius < padding || circle.origin.y - circle.radius < padding ||
+                    circle.origin.x + circle.radius > canvas.width - padding || circle.origin.y + circle.radius > canvas.height - padding) {
+                    return false;
+                }
+                this.circles.forEach(other => {
+                    if (can === true && circle !== other) {
+                        if (circle.distance(other.origin) <= circle.radius + other.radius + 5) {
+                            can = false;
+                        }
+                    }
+                });
+                return can;
+            }
+            drawCircle(circle) {
+                this.ctx.fillStyle = circle.color;
+                this.ctx.beginPath();
+                this.ctx.arc(circle.origin.x, circle.origin.y, circle.radius, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+            reset() {
+                this.circles = [];
+            }
+        }
+
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class Circle {
+            constructor(point, color) {
+                this.origin = point;
+                this.radius = 1;
+                this.color = color || this.getColor();
+                this.growing = true;
+            }
+            getColor() {
+                let r = Math.min(Math.floor(255 * (this.origin.x / canvas.width)) + 40, 255);
+                let g = Math.max(Math.floor(255 * (this.origin.x / canvas.width)) - 20, 16);
+                let b = Math.floor(255 * (this.origin.x / canvas.width));
+                return '#' + r.toString(16) + g.toString(16)  + '44';
+            }
+            grow() {
+                this.radius++;
+            }
+            distance(point) {
+                return Math.sqrt(Math.pow(point.x - this.origin.x, 2) + Math.pow(point.y - this.origin.y, 2))
+            }
+        }
+
+
+
+        let packer = new CirclePacker(canvas.getContext('2d'));
+        packer.pack();
+
+
+    </script>
+</body>
+</html>
