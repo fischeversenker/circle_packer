@@ -23,36 +23,62 @@
         canvas.height = window.innerHeight;
         const padding = 10;
 
+        let gameover = false;
+
         class CirclePacker {
             constructor(ctx) {
                 this.ctx = ctx;
                 this.circles = [];
                 this.lastPointAdded = null;
+                this.gameover = false;
+                this.setSpawnInterval();
+                this.spawner = -1;
+            }
+            setSpawnInterval(intv) {
+                this.spawnInterval = intv || 21;
             }
             pack() {
-
                 // spawn circles
-                setInterval(() => {
-                    this.circles.push(new Circle(this.getRandomCoords()));
-                    this.lastPointAdded = Date.now();
-                }, 21);
+                this.setupSpawner(this.spawnInterval);
 
                 // tick, tack...
                 function update() {
-                    requestAnimationFrame(update);
-                    packer.tick();
-                    if (Date.now() - packer.lastPointAdded > 80) {
-                        packer.reset();
+                    if (!this.gameover) {
+                        requestAnimationFrame(update.bind(this));
+                        packer.tick();
                     }
                 }
-                requestAnimationFrame(update);
+                requestAnimationFrame(update.bind(this));
+            }
+            setupSpawner(interval) {
+                this.spawner = setInterval(() => {
+                    if (!this.gameover) {
+                        this.addCircle(new Circle(this.getRandomCoords()));
+                    } else {
+                        clearInterval(spawner);
+                    }
+                }, interval);
+            }
+            addCircle(circle) {
+                this.circles.push(circle);
+                this.lastPointAdded = Date.now();
+            }
+            addCircleAt(coords) {
+                this.addCircle(new Circle(coords));
             }
             getRandomCoords() {
                 let x = Math.random() * this.ctx.canvas.width;
                 let y = Math.random() * this.ctx.canvas.height;
+                let c = 0; // to count the attempts
                 while(!this.areCoordsFree(x, y)) {
                     x = Math.random() * this.ctx.canvas.width;
                     y = Math.random() * this.ctx.canvas.height;
+                    c++;
+                }
+                if (c > 2000) {
+                    this.gameover = true;
+                    console.info('took more than 2000 tries to find an empty spot for a new circle. Restarting...');
+                    this.restart();
                 }
                 return new Point(x, y);
             }
@@ -99,6 +125,25 @@
             }
             reset() {
                 this.circles = [];
+                this.gameover = false;
+                clearInterval(this.spawner);
+            }
+            restart() {
+                this.reset();
+                this.pack();
+            }
+            clearAt(coords) {
+                let circles = this.findCirclesAt(coords);
+                if (circles.length > 0) {
+                    this.removeCircle(circles[0]);
+                }
+                return circles.length > 0;
+            }
+            findCirclesAt(coords) {
+                return this.circles.filter(circle => circle.distance(coords) < circle.radius);
+            }
+            removeCircle(circle) {
+                this.circles = this.circles.filter(other => circle !== other);
             }
         }
 
@@ -135,6 +180,34 @@
         let packer = new CirclePacker(canvas.getContext('2d'));
         packer.pack();
 
+        let dragging = false;
+        let removing = false;
+        canvas.addEventListener('mousedown', e => {
+            dragging = true;
+            let p = new Point(e.clientX, e.clientY);
+            if (!packer.clearAt(p)) {
+                packer.addCircleAt(p);
+            } else {
+                removing = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (dragging && removing) {
+                let p = new Point(e.clientX, e.clientY);
+                packer.clearAt(p);
+            }
+        });
+        canvas.addEventListener('mouseup', e => {
+            dragging = false;
+            removing = false;
+        });
+        console.info('click in whitespace to place a new bubble\nclick (and drag) a bubble to remove bubbles');
+        console.info('use reset(interval) to specify the time (in ms) before a new bubble appears (default is 21).\nusing reset() clears the entire canvas!');
+        window.reset = function(interval) {
+            packer.setSpawnInterval(interval);
+            packer.restart();
+        }
 
     </script>
 </body>
